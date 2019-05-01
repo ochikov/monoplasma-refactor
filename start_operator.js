@@ -7,8 +7,6 @@ const cors = require("cors")
 const bodyParser = require("body-parser")
 const onProcessExit = require("exit-hook")
 
-const Web3 = require("web3")
-
 const Operator = require("./src/operator")
 const { throwIfSetButNotContract } = require("./src/utils/checkArguments")
 const defaultServers = require("./defaultServers.json")
@@ -78,12 +76,9 @@ async function start() {
         privateKey = ETHEREUM_PRIVATE_KEY.startsWith("0x") ? ETHEREUM_PRIVATE_KEY : "0x" + ETHEREUM_PRIVATE_KEY
         if (privateKey.length !== 66) { throw new Error("Malformed private key, must be 64 hex digits long (optionally prefixed with '0x')") }
     } else {
-        // use account 0: 0xa3d1f77acff0060f7213d7bf3c7fec78df847de1
         privateKey = "0x7ab741b57e8d94dd7e1a29055646bafde7010f38a900f55bbd7647880faa6ee8"
         log("Starting Ethereum simulator...")
-        // const ganachePort = GANACHE_PORT || 8545
-        // const ganacheLog = msg => { log(" <Ganache> " + msg) }
-        // ganache = await require("./src/utils/startGanache")(ganachePort, ganacheLog, error)
+        
         ethereumServer = 'ws://localhost:8545';
         ganache = true;
     }
@@ -91,9 +86,6 @@ async function start() {
     log(`Connecting to ${ethereumServer}`);
     const provider = new etherlime.JSONRPCPrivateKeyDeployer(privateKey, 'http://localhost:8545');
     const accountAddress = provider.signer.signingKey.address;
-
-    // const web3 = new Web3(ethereumServer)
-    // const account = web3.eth.accounts.wallet.add(privateKey)
 
     await throwIfSetButNotContract(provider, TOKEN_ADDRESS, "Environment variable TOKEN_ADDRESS")
     await throwIfSetButNotContract(provider, CONTRACT_ADDRESS, "Environment variable CONTRACT_ADDRESS")
@@ -138,8 +130,6 @@ async function start() {
 
 async function deployContract(provider,tokenAddress, blockFreezePeriodSeconds, sendOptions, privateKey, log) {
     log(`Deploying root chain contract (token @ ${tokenAddress}, blockFreezePeriodSeconds = ${blockFreezePeriodSeconds})...`)
-    // const deployer = new etherlime.EtherlimeGanacheDeployer();
-    // deployer.setPrivateKey(privateKey)
     provider.setDefaultOverrides(sendOptions)
     const result = await provider.deploy(MonoplasmaJson, {}, tokenAddress, blockFreezePeriodSeconds);
     return result.contractAddress;

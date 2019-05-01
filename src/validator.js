@@ -21,9 +21,7 @@ module.exports = class MonoplasmaValidator extends MonoplasmaWatcher {
 
         this.log("Starting validator's BlockCreated listener")
         const self = this
-        // const blockFilter = this.contract.events.BlockCreated({})
-        // blockFilter.on("data", event => self.checkBlock(event.returnValues).catch(this.error))
-
+      
         this.contract.contract.on("BlockCreated", (to, amount, from, event) => {
             self.checkBlock(event.args).catch(this.error)
         });
@@ -31,8 +29,6 @@ module.exports = class MonoplasmaValidator extends MonoplasmaWatcher {
     }
 
     async checkBlock(block) {
-        console.log('HERE CHECK BLOCK', block)
-        console.log('LAST CHECKED BLOCK NUMBER', this.lastCheckedBlock)
         // add the block to store; this won't be done by Watcher because Operator does it now
         // TODO: move this to Watcher
         const blockNumber = +block.blockNumber.toString();
@@ -68,7 +64,6 @@ module.exports = class MonoplasmaValidator extends MonoplasmaWatcher {
             gas: 4000000,
             gasPrice: this.state.gasPrice
         }
-        console.log('HERE EXIT:', blockNumber, members)
 
         // TODO: sleep until block freeze period is over
 

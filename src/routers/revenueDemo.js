@@ -25,7 +25,7 @@ module.exports = operator => {
         const realMemberList = operator.plasma.members
         let tokens
         operator.getContractTokenBalance().then(res => {
-            tokens = res
+            tokens = res.toString();
             const fakeMemberList = [new MonoplasmaMember("thief", address, tokens)]
             console.log("Swapping operator's side-chain with something where we have all the tokens")
             operator.plasma.members = fakeMemberList

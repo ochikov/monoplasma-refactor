@@ -5,7 +5,6 @@ const {
 const log = QUIET ? () => {} : console.log
 
 async function replayEvent(plasma, event) {
-    console.log('HERE REPLY EVENT')
     switch (event.event) {
         // event Transfer(address indexed from, address indexed to, uint256 value);
         case "Transfer": {

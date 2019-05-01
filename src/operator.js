@@ -1,4 +1,6 @@
-const MonoplasmaWatcher = require("./watcher")
+const MonoplasmaWatcher = require("./watcher");
+const { replayEvent, mergeEventLists } = require("./utils/events")
+
 
 module.exports = class MonoplasmaOperator extends MonoplasmaWatcher {
 
@@ -13,23 +15,12 @@ module.exports = class MonoplasmaOperator extends MonoplasmaWatcher {
 
     async start() {
         await super.start()
-
-        // old web3
-        // this.tokenFilter.on("data", event => this.onTokensReceived(event).catch(this.error))
-
-
-        //old ethers
-        // const filter = this.token.contract.filters.Transfer(null, this.state.contractAddress);
-        // this.token.contract.on(filter, (fromAddress, toAddress, value, event) => {
-        //     this.onTokensReceived(event).catch(this.error);
-        // })
-
-
-        //new ethers
-        // console.log('HERE', this.token)
-       this.token.contract.on(this.tokenFilter, (to, amount, from, event) => {
-            console.log('OPERATOR EVENT', event)
-            this.onTokensReceived(event).catch(this.error);
+        this.token.contract.on(this.tokenFilter, (to, from, amount, event) => {
+            if (from == this.state.contractAddress) {
+                replayEvent(this.plasma, event).catch(this.error)
+                this.onTokensReceived(event).catch(this.error);
+                return this.store.saveState(this.state).catch(this.error)
+           }
         });
     }
 
@@ -47,8 +38,6 @@ module.exports = class MonoplasmaOperator extends MonoplasmaWatcher {
     }
 
     async publishBlock(blockNumber) {
-        console.log('HERE BLOCK', blockNumber)
-        console.log('HERE BLOCK FROM STSTE', this.state.lastBlockNumber)
         const bnum = blockNumber || this.state.lastBlockNumber
         if (blockNumber <= this.state.lastPublishedBlock) {
             throw new Error(`Block #${this.state.lastPublishedBlock} has already been published, can't publish #${blockNumber}`)
@@ -57,7 +46,7 @@ module.exports = class MonoplasmaOperator extends MonoplasmaWatcher {
         const hash = this.plasma.getRootHash()
         const ipfsHash = ""
 
-        // await this.contract.commit(bnum, hash, ipfsHash);
+        await this.contract.commit(bnum, hash, ipfsHash);
         this.state.lastPublishedBlock = bnum
         return this.plasma.storeBlock(bnum)     // TODO: move this to Watcher
     }

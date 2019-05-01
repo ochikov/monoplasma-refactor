@@ -3,7 +3,6 @@ const fsEx = require("fs-extra")
 const path = require("path")
 
 const prettyjson = require("prettyjson")
-const Web3 = require("web3")
 
 const Validator = require("./src/validator")
 const { throwIfNotContract } = require("./src/utils/checkArguments")
@@ -57,7 +56,6 @@ async function start() {
     if (!ethereumServer) { throw new Error("ethereumServer not found in config, please supply ETHEREUM_SERVER or ETHEREUM_NETWORK_ID you'd like to connect to as environment variable!") }
 
     log(`Connecting to ${ethereumServer}...`)
-    // const web3 = new Web3(ethereumServer)
     let key = "0x5e98cce00cff5dea6b454889f359a4ec06b9fa6b88e9d69b86de8e1c81887da0"
     const provider = new etherlime.JSONRPCPrivateKeyDeployer(key,'http://localhost:8545');
     let address = null

@@ -5,6 +5,7 @@ const { throwIfSetButNotContract } = require("./utils/checkArguments")
 const TokenJson = require("../build/ERC20Mintable.json")
 const MonoplasmaJson = require("../build/Monoplasma.json")
 const etherlime = require('etherlime');
+const ethers = require('ethers');
 
 /**
  * MonoplasmaWatcher hooks to the root chain contract and keeps a local copy of the Monoplasma state up to date
@@ -34,7 +35,6 @@ module.exports = class MonoplasmaWatcher {
 
         this.state.tokenAddress = await this.contract.token();
       
-        // this.token = etherlime.ContractAt(TokenJson, this.state.tokenAddress)
         this.token = this.provider.wrapDeployedContract(TokenJson, this.state.tokenAddress)
         this.state.blockFreezeSeconds = (await this.contract.blockFreezeSeconds()).toString();
 
@@ -55,36 +55,8 @@ module.exports = class MonoplasmaWatcher {
         }
 
         this.log("Listening to Ethereum events...")
-        // old ethers
-        // this.tokenFilter = this.token.contract.filters.Transfer(null, this.state.contractAddress);
-        // this.token.contract.on(this.tokenFilter, (fromAddress, toAddress, value, event) => {
-        //     console.log('ETHEREUM EVENT', event)
-        //     this.state.lastBlockNumber = +event.blockNumber
-        //     replayEvent(this.plasma, event).catch(this.error)
-        //     return this.store.saveState(this.state).catch(this.error)
-        // })
-
-
-        // new ethers
+      
         this.tokenFilter = 'Transfer';
-
-        this.token.contract.on(this.tokenFilter, (to, amount, from, event) => {
-            console.log('HERE wather EVENT')
-            this.state.lastBlockNumber = +event.blockNumber
-            replayEvent(this.plasma, event).catch(this.error)
-            return this.store.saveState(this.state).catch(this.error)
-        });
-
-
-        // old web3
-        // this.tokenFilter = this.token.events.Transfer({ filter: { to: this.state.contractAddress } })
-        // this.tokenFilter.on("data", event => {
-        //     this.state.lastBlockNumber = +event.blockNumber
-        //     replayEvent(this.plasma, event).catch(this.error)
-        //     return this.store.saveState(this.state).catch(this.error)
-        // })
-        // this.tokenFilter.on("changed", event => { this.error("Event removed in re-org!", event) })
-        // this.tokenFilter.on("error", this.error)
 
         this.log("Listening to joins/parts from the Channel...")
         this.channel.listen()
@@ -130,7 +102,6 @@ module.exports = class MonoplasmaWatcher {
         // TODO interim solution: take members from a recent block
         this.log(`Playing back blocks ${fromBlock}...${toBlock}`)
         const joinPartEvents = await this.store.loadEvents(fromBlock, toBlock + 1)       // +1 to catch events after the very latest block, see join/part listening above
-        // const blockCreateEvents = await this.contract.getPastEvents("BlockCreated", { fromBlock, toBlock })
 
         const blockCreatedFilter = {
             address: this.state.contractAddress,
@@ -139,22 +110,36 @@ module.exports = class MonoplasmaWatcher {
             topics: [this.contract.interface.events.BlockCreated.topic]
           };
         const blockCreateEvents = await this.provider.provider.getLogs(blockCreatedFilter);
-        console.log('HERE BLOCK CREATED EVENTS', blockCreateEvents)
+        for (let blockEvent in blockCreateEvents) {
+            blockCreateEvents[blockEvent].event = 'BlockCreated';
+            const result = this.contract.interface.events.BlockCreated.decode(blockCreateEvents[blockEvent].data);
+            blockCreateEvents[blockEvent].args = result;
+        }
 
-        const transferEventFilter = {
-            address: this.state.contractAddress,
+        
+        let transferEvents = [];
+        let rawTransferEvents = [];
+
+        let abi = [ "event Transfer(address indexed from, address indexed to, uint256 value)" ];
+        let iface = new ethers.utils.Interface(abi);
+
+        let transferEventFilter = {
+            address: this.state.tokenAddress,
             fromBlock: fromBlock,
-            toBlock: toBlock,
-            topics: [this.token.interface.events.Transfer.topic]
+            toBlock: toBlock
         };
 
-        const transferEvents = await this.provider.provider.getLogs(transferEventFilter);
-        console.log('HERE Transfer EVENTS', transferEvents)
+        rawTransferEvents = await this.provider.provider.getLogs(transferEventFilter);
+        for (let transferEvent in rawTransferEvents) {
+            rawTransferEvents[transferEvent].args = iface.parseLog(rawTransferEvents[transferEvent]) ? iface.parseLog(rawTransferEvents[transferEvent]).values : null;
+            rawTransferEvents[transferEvent].event = 'Transfer';
+        }
+       
+        transferEvents = rawTransferEvents.filter(event => (event.args !== null) && (event.args.to === this.state.contractAddress))
 
-
-         // const transferEvents = await this.token.getPastEvents("Transfer", { filter: { to: this.state.contractAddress }, fromBlock, toBlock })
         const ethereumEvents = mergeEventLists(blockCreateEvents, transferEvents)
         const allEvents = mergeEventLists(ethereumEvents, joinPartEvents)
+
         for (const event of allEvents) {
             await replayEvent(plasma, event)
         }

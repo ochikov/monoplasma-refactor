@@ -187,6 +187,7 @@ module.exports = class MonoplasmaState {
         const activeCount = activeMembers.length
         if (activeCount === 0) {
             console.warn(`No active members in community! Allocating ${amount} to default account ${this.defaultMember.address}`)
+            amount = amount.toString();
             this.defaultMember.addRevenue(amount)
         } else {
             amount = amount.toString();
