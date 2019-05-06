@@ -3,13 +3,13 @@
 /* eslint-disable react/no-unused-state */
 
 import React, { type Node, Component } from 'react'
-import Eth from 'ethjs'
 import Context, { type Props as ContextProps } from '../../contexts/Wallet'
+import { ethers as ethers } from 'ethers';
 
-const { Web3, ethereum, web3 } = typeof window !== 'undefined' ? window : {}
+const { ethereum, web3 } = typeof window !== 'undefined' ? window : {}
 const provider = ethereum || (web3 && web3.currentProvider)
 
-type Props = {
+type etProps = {
     children: Node,
 }
 
@@ -20,14 +20,13 @@ class Wallet extends Component<Props, State> {
         super(props)
 
         if (provider) {
-            this.web3 = new Web3(provider)
-            this.eth = new Eth(provider)
+
+            this.ethersWeb3Provider = new ethers.providers.Web3Provider(provider);
         }
 
         this.state = {
             accountAddress: null,
-            web3: this.web3,
-            eth: this.eth,
+            ethersWeb3Provider: this.ethersWeb3Provider
         }
     }
 
@@ -64,6 +63,7 @@ class Wallet extends Component<Props, State> {
         if (ethereum) {
             try {
                 await ethereum.enable()
+                console.log('ethereum.selectedAddress', ethereum.selectedAddress)
                 return ethereum.selectedAddress
             } catch (e) {
                 /* catcher */
@@ -71,6 +71,7 @@ class Wallet extends Component<Props, State> {
         } else if (web3) {
             try {
                 const accounts = await this.eth.accounts()
+                console.log('web3', accounts[0]);
                 return accounts[0] || null
             } catch (e) {
                 /* catcher */
@@ -80,9 +81,8 @@ class Wallet extends Component<Props, State> {
         return null
     }
 
-    web3: any
 
-    eth: any
+    ethersWeb3Provider: any
 
     unmounted: boolean
 

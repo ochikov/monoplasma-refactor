@@ -1,38 +1,43 @@
 const { spawn } = require("child_process")
 const fetch = require("node-fetch")
-const Web3 = require("web3")
-const BN = require("bn.js")
 const assert = require("assert")
 
 const sleep = require("../utils/sleep-promise")
 const { untilStreamContains } = require("../utils/await-until")
 
-const TokenJson = require("../../build/ERC20Mintable.json")
+const ERC20Mintable = require("../../build/ERC20Mintable.json")
 const MonoplasmaJson = require("../../build/Monoplasma.json")
+const etherlime = require('etherlime');
+const ethers = require('ethers');
 
 const STORE_DIR = __dirname + `/test-store-${+new Date()}`
-const GANACHE_PORT = 8296
+const GANACHE_PORT = 8545
 const WEBSERVER_PORT = 3030
 const JOIN_PART_CHANNEL_PORT = 5964
 const BLOCK_FREEZE_SECONDS = 1
 
-const from = "0xa3d1f77acff0060f7213d7bf3c7fec78df847de1"
+const from = "0xd9995bae12fee327256ffec1e3184d492bd94c31"
 
 const { loadState } = require("../../src/fileStore")(STORE_DIR)
 
 describe("Revenue sharing demo", () => {
     let operatorProcess
-    it("should get through the happy path", async () => {
+    const admin = '0x7ab741b57e8d94dd7e1a29055646bafde7010f38a900f55bbd7647880faa6ee8'
+
+    it("should get through the happy path", async function () {
+        this.timeout(30000)
         console.log("--- Running start_operator.js ---")
-        operatorProcess = spawn(process.execPath, ["start_operator.js"], { env: {
-            STORE_DIR,
-            GANACHE_PORT,
-            WEBSERVER_PORT,
-            JOIN_PART_CHANNEL_PORT,
-            BLOCK_FREEZE_SECONDS,
-            RESET: "yesplease",
-            //QUIET: "shutup",      // TODO: this makes start_operator.js not return in time... weird
-        }})
+        operatorProcess = spawn(process.execPath, ["start_operator.js"], {
+            env: {
+                STORE_DIR,
+                GANACHE_PORT,
+                WEBSERVER_PORT,
+                JOIN_PART_CHANNEL_PORT,
+                BLOCK_FREEZE_SECONDS,
+                RESET: "yesplease",
+                //QUIET: "shutup",      // TODO: this makes start_operator.js not return in time... weird
+            }
+        })
         operatorProcess.stdout.on("data", data => { console.log(`<op> ${data.toString().trim()}`) })
         operatorProcess.stderr.on("data", data => { console.log(`op *** ERROR: ${data}`) })
         operatorProcess.on("close", code => { console.log(`start_operator.js exited with code ${code}`) })
@@ -43,9 +48,11 @@ describe("Revenue sharing demo", () => {
         console.log("--- Operator started, getting the init state ---")
         const state = await loadState()
 
-        const web3 = new Web3(`ws://localhost:${GANACHE_PORT}`)
-        const contract = new web3.eth.Contract(MonoplasmaJson.abi, state.contractAddress)
-        const token = new web3.eth.Contract(TokenJson.abi, state.tokenAddress)
+        console.log('state', state)
+        const token = await etherlime.ContractAt(ERC20Mintable, state.tokenAddress)
+        const contract = await etherlime.ContractAt(MonoplasmaJson, state.contractAddress);
+
+        console.log(contract.contract.address)
 
         const opts = {
             from,
@@ -79,14 +86,14 @@ describe("Revenue sharing demo", () => {
         console.log("2) click 'Add revenue' button a couple times")
         for (let i = 0; i < 5; i++) {
             console.log("   Sending 10 tokens to Monoplasma contract...")
-            await token.methods.transfer(contract.options.address, web3.utils.toWei("10", "ether")).send(opts)
+            await token.transfer(contract.contract.address, ethers.utils.parseEther('10'));
 
             // TODO: things will break if revenue is added too fast. You can remove the below row to try and fix it.
-            await sleep(1000)
+            await sleep(5000)
 
             // check total revenue
             const res2 = await fetch(`http://localhost:${WEBSERVER_PORT}/api/status`).then(resp => resp.json())
-            console.log(`   Total revenue: ${JSON.stringify(res2)}`)
+            console.log(`   Total revenue: ${JSON.stringify(res2.totalEarnings)}`)
         }
 
         console.log("   Waiting for blocks to unfreeze...")
@@ -96,21 +103,21 @@ describe("Revenue sharing demo", () => {
         const res3 = await fetch(`http://localhost:${WEBSERVER_PORT}/api/members/${from}`).then(resp => resp.json())
         console.log(res3)
 
-        const balanceBefore = await token.methods.balanceOf(from).call()
+        const balanceBefore = await token.balanceOf(from);
         console.log(`   Token balance before: ${balanceBefore}`)
 
         console.log("4) click 'Withdraw' button")
-        await contract.methods.withdrawAll(res3.withdrawableBlockNumber, res3.withdrawableEarnings, res3.proof).send(opts)
+        await contract.withdrawAll(res3.withdrawableBlockNumber, res3.withdrawableEarnings, res3.proof)
 
         // check that we got the tokens
-        const balanceAfter = await token.methods.balanceOf(from).call()
+        const balanceAfter = await token.balanceOf(from);
         console.log(`   Token balance after: ${balanceAfter}`)
 
-        const difference = new BN(balanceAfter).sub(new BN(balanceBefore))
+        const difference = balanceAfter.sub(balanceBefore);
         console.log(`   Withdraw effect: ${difference}`)
 
-        assert.strictEqual(difference.toString(10), web3.utils.toWei("5", "ether"))
-    }).timeout(15000)
+        assert(difference.eq(ethers.utils.parseEther('5')));
+    })
 
     after(() => {
         operatorProcess.kill()

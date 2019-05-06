@@ -16,7 +16,15 @@ async function throwIfNotContract(provider, address, context) {
     }
 }
 
+function isAddress(address) {
+    try {
+        ethers.utils.getAddress(address);
+    } catch (e) { return false; }
+    return true;
+}
+
 module.exports = {
     throwIfNotContract,
     throwIfSetButNotContract,
+    isAddress
 }

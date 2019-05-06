@@ -1,5 +1,5 @@
 const BN = require("bn.js")
-const {utils: { isAddress }} = require("web3")
+const { isAddress } = require('./utils/checkArguments');
 
 module.exports = class MonoplasmaMember {
     constructor(name, address, earnings) {

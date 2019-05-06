@@ -6,7 +6,7 @@ const {
     MAX_BLOCK_LOG_ENTRY_LENGTH,
 } = process.env
 
-const log = QUIET ? () => {} : console.log
+const log = QUIET ? () => { } : console.log
 const maxLogLen = MAX_BLOCK_LOG_ENTRY_LENGTH || 840
 const sanitize = logEntry => logEntry.length < maxLogLen ? logEntry : logEntry.slice(0, maxLogLen) + "... TOTAL LENGTH: " + logEntry.length
 
@@ -21,9 +21,16 @@ module.exports = (storeDir) => {
     log(`Setting up fileStore directories under ${storeDir}...`)
     const blocksDir = path.join(storeDir, "blocks")
     const eventsDir = path.join(storeDir, "events")
-    fs.mkdirSync(storeDir, { recursive: true })
-    fs.mkdirSync(blocksDir, { recursive: true })
-    fs.mkdirSync(eventsDir, { recursive: true })
+    console.log('OGI IS HERE')
+    if (!fs.existsSync(storeDir)) {
+        fs.mkdirSync(storeDir, { recursive: true })
+    }
+    if (!fs.existsSync(blocksDir)) {
+        fs.mkdirSync(blocksDir, { recursive: true })
+    }
+    if (!fs.existsSync(eventsDir)) {
+        fs.mkdirSync(eventsDir, { recursive: true })
+    }
     const blockNameRE = /(\d*)\.json/
 
     const stateStorePath = path.join(storeDir, "state.json")

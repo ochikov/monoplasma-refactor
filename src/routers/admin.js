@@ -1,6 +1,5 @@
 const express = require("express")
-const {utils: { isAddress }} = require("web3")
-
+const { isAddress } = require('../utils/checkArguments');
 module.exports = channel => {
     const router = express.Router()
 
@@ -14,12 +13,12 @@ module.exports = channel => {
     router.post("/members", (req, res) => {
         const addresses = Array.isArray(req.body) ? req.body : [req.body]
         if (addresses.length < 1) {
-            res.status(400).send({error: "Must provide at least one member object to add!"})
+            res.status(400).send({ error: "Must provide at least one member object to add!" })
             return
         }
         for (const address of addresses) {
             if (!isAddress(address)) {
-                res.status(400).send({error: `Bad Ethereum address when adding members: ${address}`})
+                res.status(400).send({ error: `Bad Ethereum address when adding members: ${address}` })
                 return
             }
         }
@@ -33,7 +32,7 @@ module.exports = channel => {
     router.delete("/members/:address", (req, res) => {
         const address = req.params.address
         if (!isAddress(address)) {
-            res.status(400).send({error: `Bad Ethereum address: ${address}`})
+            res.status(400).send({ error: `Bad Ethereum address: ${address}` })
             return
         }
         channel.publish("part", [address])

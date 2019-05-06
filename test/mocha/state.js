@@ -31,18 +31,19 @@ describe("MonoplasmaState", () => {
         plasma.addRevenue(100)
         assert.deepStrictEqual(plasma.getMemberCount(), { total: 2, active: 2, inactive: 0 })
         assert.deepStrictEqual(plasma.getMembers(), [
-            {"address": "0xb3428050ea2448ed2e4409be47e1a50ebac0b2d2", "earnings": "50", "name": "tester1"},
-            {"address": "0xe5019d79c3fc34c811e68e68c9bd9966f22370ef", "earnings": "50", "name": "tester2"},
+            { "address": "0xb3428050ea2448ed2e4409be47e1a50ebac0b2d2", "earnings": "50", "name": "tester1" },
+            { "address": "0xe5019d79c3fc34c811e68e68c9bd9966f22370ef", "earnings": "50", "name": "tester2" },
         ])
         plasma.removeMember("0xe5019d79c3fc34c811e68e68c9bd9966f22370ef")
         plasma.addRevenue(100)
         assert.deepStrictEqual(plasma.getMemberCount(), { total: 2, active: 1, inactive: 1 })
         assert.deepStrictEqual(plasma.getMembers(), [
-            {"address": "0xb3428050ea2448ed2e4409be47e1a50ebac0b2d2", "earnings": "150", "name": "tester1"},
+            { "address": "0xb3428050ea2448ed2e4409be47e1a50ebac0b2d2", "earnings": "150", "name": "tester1" },
         ])
     })
 
-    it("should not crash with large number of members", () => {
+    it("should not crash with large number of members", function () {
+        this.timeout(10000);
         const initialMembers = []
         while (initialMembers.length < 200000) {
             initialMembers.push({

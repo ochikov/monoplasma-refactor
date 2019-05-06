@@ -1,12 +1,11 @@
 const express = require("express")
 const BN = require("bn.js")
-const {utils: { isAddress }} = require("web3")
-
+const { isAddress } = require('../utils/checkArguments');
 const {
     QUIET,
 } = process.env
 
-const log = QUIET ? () => {} : console.log
+const log = QUIET ? () => { } : console.log
 
 /** Don't send the full member list back, only member count */
 function blockToApiObject(block) {
@@ -52,12 +51,12 @@ module.exports = plasma => {
         const address = req.params.address
         //log(`Requested member ${address}`)  // commented out because demo UI spams it
         if (!isAddress(address)) {
-            res.status(400).send({error: `Bad Ethereum address: ${address}`})
+            res.status(400).send({ error: `Bad Ethereum address: ${address}` })
             return
         }
         const member = plasma.getMember(address)
         if (!member) {
-            res.status(404).send({error: `Member not found: ${address}`})
+            res.status(404).send({ error: `Member not found: ${address}` })
             return
         }
 
@@ -91,7 +90,7 @@ module.exports = plasma => {
         const blockNumber = +req.params.blockNumber
         log(`Requested block ${blockNumber}`)
         if (Number.isNaN(blockNumber)) {
-            res.status(400).send({error: `Bad block number: ${req.params.blockNumber}`})
+            res.status(400).send({ error: `Bad block number: ${req.params.blockNumber}` })
             return
         }
 

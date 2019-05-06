@@ -49,7 +49,7 @@ const {
     //EXTERNAL_WEBSERVER,
 } = process.env
 
-const log = QUIET ? () => {} : console.log
+const log = QUIET ? () => { } : console.log
 const error = (e, ...args) => {
     console.error(e.stack, args)
     process.exit(1)
@@ -59,14 +59,6 @@ const storeDir = fs.existsSync(STORE_DIR) ? STORE_DIR : __dirname + "/demo/publi
 const fileStore = require("./src/fileStore")(storeDir)
 
 let ganache = null
-function stopGanache() {
-    if (ganache) {
-        log("Shutting down Ethereum simulator...")
-        ganache.shutdown()
-        ganache = null
-    }
-}
-onProcessExit(stopGanache)
 
 async function start() {
     let privateKey
@@ -78,7 +70,7 @@ async function start() {
     } else {
         privateKey = "0x7ab741b57e8d94dd7e1a29055646bafde7010f38a900f55bbd7647880faa6ee8"
         log("Starting Ethereum simulator...")
-        
+
         ethereumServer = 'ws://localhost:8545';
         ganache = true;
     }
@@ -98,9 +90,9 @@ async function start() {
     // ignore the saved config / saved state if not using a fresh ganache instance
     // augment the config / saved state with variables that may be useful for the validators
     const config = RESET || ganache ? {} : await fileStore.loadState()
-    config.tokenAddress = TOKEN_ADDRESS || config.tokenAddress || await deployDemoToken(provider,TOKEN_NAME, TOKEN_SYMBOL, opts, privateKey, log)
+    config.tokenAddress = TOKEN_ADDRESS || config.tokenAddress || await deployDemoToken(provider, TOKEN_NAME, TOKEN_SYMBOL, opts, privateKey, log)
     config.blockFreezeSeconds = +BLOCK_FREEZE_SECONDS || config.blockFreezeSeconds || 20
-    config.contractAddress = CONTRACT_ADDRESS || config.contractAddress || await deployContract(provider,config.tokenAddress, config.blockFreezeSeconds, opts, privateKey, log)
+    config.contractAddress = CONTRACT_ADDRESS || config.contractAddress || await deployContract(provider, config.tokenAddress, config.blockFreezeSeconds, opts, privateKey, log)
     config.ethereumServer = ethereumServer
     config.ethereumNetworkId = ETHEREUM_NETWORK_ID
     config.channelPort = JOIN_PART_CHANNEL_PORT
@@ -118,7 +110,7 @@ async function start() {
     const serverURL = `http://localhost:${port}`
     const app = express()
     app.use(cors())
-    app.use(bodyParser.json({limit: "50mb"}))
+    app.use(bodyParser.json({ limit: "50mb" }))
     app.use("/api", operatorRouter(operator.plasma.getMemberApi()))
     app.use("/admin", adminRouter(adminChannel))
     app.use("/demo", revenueDemoRouter(operator))
@@ -128,7 +120,7 @@ async function start() {
     log("[DONE]")
 }
 
-async function deployContract(provider,tokenAddress, blockFreezePeriodSeconds, sendOptions, privateKey, log) {
+async function deployContract(provider, tokenAddress, blockFreezePeriodSeconds, sendOptions, privateKey, log) {
     log(`Deploying root chain contract (token @ ${tokenAddress}, blockFreezePeriodSeconds = ${blockFreezePeriodSeconds})...`)
     provider.setDefaultOverrides(sendOptions)
     const result = await provider.deploy(MonoplasmaJson, {}, tokenAddress, blockFreezePeriodSeconds);

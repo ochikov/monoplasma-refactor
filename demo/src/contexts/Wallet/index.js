@@ -4,12 +4,10 @@ import { createContext } from 'react'
 
 export type Props = {
     accountAddress: ?string,
-    web3: any,
-    eth: any,
+    ethersWeb3Provider: any
 }
 
 export default createContext<Props>({
     accountAddress: null,
-    web3: null,
-    eth: null,
+    ethersWeb3Provider: null
 })

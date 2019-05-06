@@ -6,8 +6,6 @@
 /* eslint-disable newline-per-chained-call */
 
 import React, { Component, type Node, Fragment } from 'react'
-import BN from 'bn.js'
-import Eth from 'ethjs'
 
 import HomeComponent from '../../components/Home'
 import Context, { type Props as ContextProps } from '../../contexts/Home'
@@ -16,11 +14,12 @@ import { type Block } from '../../components/Home/Blocks'
 
 import tokenAbi from '../../utils/tokenAbi'
 import monoplasmaAbi from '../../utils/monoplasmaAbi'
+import { ethers as ethers } from 'ethers';
 
 // TODO: move to where network is checked. This actually should depend on chosen network.
 const etherscanUrl = 'http://rinkeby.infura.io'
 
-const MINT_TOKEN_AMOUNT = Eth.toWei('1000000', 'ether')
+const MINT_TOKEN_AMOUNT = ethers.utils.parseEther('1000000');
 
 type Props = WalletContextProps & {}
 
@@ -31,7 +30,7 @@ type State = ContextProps & {
     member: any,
 }
 
-const toFixed18 = (num: number) => new BN(10).pow(new BN(18)).mul(new BN(num))
+const toFixed18 = (num: number) => ethers.utils.bigNumberify(10).pow(ethers.utils.bigNumberify(18)).mul(ethers.utils.bigNumberify(num));
 
 // TODO: disable alert for demo  (;
 const handleError = (error) => {
@@ -50,21 +49,21 @@ class Home extends Component<Props, State> {
 
     state = {
         account: [
-            ['Total earnings', new BN(0)],
-            ['Earnings frozen', new BN(0)],
-            ['Total withdrawn', new BN(0)],
-            ['Total earnings recorded', new BN(0)],
-            ['Earnings available', new BN(0)],
+            ['Total earnings', ethers.utils.bigNumberify(0)],
+            ['Earnings frozen', ethers.utils.bigNumberify(0)],
+            ['Total withdrawn', ethers.utils.bigNumberify(0)],
+            ['Total earnings recorded', ethers.utils.bigNumberify(0)],
+            ['Earnings available', ethers.utils.bigNumberify(0)],
         ],
         revenuePool: [
-            ['Members', new BN(0)],
-            ['Total earnings', new BN(0)],
-            ['Earnings frozen', new BN(0)],
-            ['Contract balance', new BN(0)],
-            ['Total earnings recorded', new BN(0)],
-            ['Earnings available', new BN(0)],
+            ['Members', ethers.utils.bigNumberify(0)],
+            ['Total earnings', ethers.utils.bigNumberify(0)],
+            ['Earnings frozen', ethers.utils.bigNumberify(0)],
+            ['Contract balance', ethers.utils.bigNumberify(0)],
+            ['Total earnings recorded', ethers.utils.bigNumberify(0)],
+            ['Earnings available', ethers.utils.bigNumberify(0)],
             null,
-            ['Total withdrawn', new BN(0)],
+            ['Total withdrawn', ethers.utils.bigNumberify(0)],
         ],
         serverConnectionError: false,
         blocks: [1, 2, 3, 4, 5],
@@ -111,10 +110,10 @@ class Home extends Component<Props, State> {
         function pollBlocks() {
             if (self.unmounted) { return }
 
-            self.updateCommunity().then(() => {
+            self.updateCommunity().then(async () => {
                 const { member } = self.state
                 if (member) {
-                    return self.updateUser(member.address)
+                    return await self.updateUser(member.address)
                 }
                 return null
             }).then(() => {
@@ -137,9 +136,9 @@ class Home extends Component<Props, State> {
         this.unmounted = true
     }
 
-    onViewClick(address: string) {
+    async onViewClick(address: string) {
         console.log('View ', address, this)
-        this.updateUser(address).catch(handleError)
+        await this.updateUser(address).catch(handleError)
     }
 
     onKickClick(address: string) {
@@ -152,64 +151,56 @@ class Home extends Component<Props, State> {
         }).catch(handleError)
     }
 
-    onWithdrawClick(address: string) {
+    async onWithdrawClick(address: string) {
         console.log('Withdraw', address, this)
         const { config } = this.state
-        const { eth, accountAddress } = this.props
-
+        const { accountAddress, ethersWeb3Provider } = this.props
         if (!config) {
             console.warn('Missing config. Has not loaded yet?')
             return
         }
 
-        const opts = {
-            from: accountAddress,
-        }
+        const signer = ethersWeb3Provider.getSigner(accountAddress);
+        const monoplasma = new ethers.Contract(config.contractAddress, monoplasmaAbi, signer);
 
-        const monoplasma = new eth.contract(monoplasmaAbi).at(config.contractAddress)
-
-        this.updateUser(address).then((member) => {
-            const { withdrawableBlockNumber, withdrawableEarnings, proof } = member
+        try {
+            const result = await this.updateUser(address);
+            const { withdrawableBlockNumber, withdrawableEarnings, proof } = result;
             if (!withdrawableBlockNumber) {
                 throw new Error('No blocks to withdraw from!')
             }
-            return monoplasma.withdrawAllFor(address, withdrawableBlockNumber, withdrawableEarnings, proof, opts)
-        }).then((txHash) => {
-            console.log(`withdrawAll transaction pending: ${etherscanUrl}/tx/${txHash}`)
-            return eth.getTransactionSuccess(txHash)
-        }).then((receipt) => {
-            console.log(`withdrawAll transaction successful: ${JSON.stringify(receipt)}`)
-            this.updateUser(address)
+            const tx = await monoplasma.withdrawAllFor(address, withdrawableBlockNumber, withdrawableEarnings, proof);
+            console.log(`withdrawAll transaction successful: ${JSON.stringify(tx)}`)
+            await this.updateUser(address)
             this.updateCommunity()
-        }).catch(handleError)
+        } catch (e) {
+            handleError(e);
+        }
     }
 
-    onAddRevenueClick(amount: number) {
+    async onAddRevenueClick(amount: number) {
         console.log('Add revenue', amount, this)
         const { config, member } = this.state
-        const { eth, accountAddress } = this.props
-        const amountWei = Eth.toWei(amount, 'ether')
-        const opts = {
-            from: accountAddress,
-        }
+        const { accountAddress, ethersWeb3Provider } = this.props
+        const amountToWei = ethers.utils.parseEther(amount.toString());
 
         if (!config) {
             console.warn('Missing config. Has not loaded yet?')
             return
         }
 
-        const token = new eth.contract(tokenAbi).at(config.tokenAddress)
-
-        token.transfer(config.contractAddress, amountWei, opts).then((txHash) => {
-            console.log(`transfer transaction pending: ${etherscanUrl}/tx/${txHash}`)
-            return eth.getTransactionSuccess(txHash)
-        }).then((receipt) => {
-            console.log(`add revenue / transfer transaction successful: ${JSON.stringify(receipt)}`)
+        const signer = ethersWeb3Provider.getSigner(accountAddress);
+        const token = new ethers.Contract(config.tokenAddress, tokenAbi, signer);
+        try {
+            const tx = await token.transfer(config.contractAddress, amountToWei);
+            console.log(`add revenue / transfer transaction successful: ${JSON.stringify(tx)}`)
             if (member) {
-                this.updateUser(member.address)
+                await this.updateUser(member.address)
             }
             this.updateCommunity()
-        }).catch(handleError)
+        } catch (e) {
+            this.handleError(e);
+        }
     }
 
     onForcePublishClick() {
@@ -221,7 +212,7 @@ class Home extends Component<Props, State> {
 
     onAddUsersClick(addresses: Array<string>) {
         console.log('Add users', addresses, this)
-        const userList = addresses.filter(Eth.isAddress)
+        const userList = addresses.filter(ethers.utils.getAddress);
         fetch('http://localhost:8080/admin/members', {
             method: 'POST',
             headers: {
@@ -234,37 +225,32 @@ class Home extends Component<Props, State> {
         }).catch(handleError)
     }
 
-    onMintClick() {
+    async onMintClick() {
         console.log('Mint tokens', this)
         const { config } = this.state
-        const { eth, accountAddress } = this.props
-        const opts = {
-            from: accountAddress,
-        }
+        const { accountAddress, ethersWeb3Provider } = this.props
 
         if (!config) {
             console.warn('Missing config. Has not loaded yet?')
             return
         }
 
-        const token = new eth.contract(tokenAbi).at(config.tokenAddress)
+        const signer = ethersWeb3Provider.getSigner(accountAddress);
+        const token = new ethers.Contract(config.tokenAddress, tokenAbi, signer);
 
-        token.mint(accountAddress, MINT_TOKEN_AMOUNT, opts).then((txHash) => {
-            console.log(`mint transaction pending: ${etherscanUrl}/tx/${txHash}`)
-            return eth.getTransactionSuccess(txHash)
-        }).then((receipt) => {
-            console.log(`mint transaction successful: ${JSON.stringify(receipt)}`)
-        }).catch(handleError)
+        try {
+            const tx = await token.mint(accountAddress, MINT_TOKEN_AMOUNT);
+            console.log(`mint transaction pending: ${etherscanUrl}/tx/${tx.txHash}`)
+            console.log(`mint transaction successful: ${JSON.stringify(tx)}`)
+        } catch (e) {
+            handleError(e)
+        }
     }
 
-    onStealClick() {
-        const { eth, accountAddress } = this.props
+    async onStealClick() {
+        const { accountAddress, ethersWeb3Provider } = this.props
         const { config } = this.state
         console.log('Steal tokens')
-
-        const opts = {
-            from: accountAddress,
-        }
 
         if (!config) {
             console.warn('Missing config. Has not loaded yet?')
@@ -276,23 +262,23 @@ class Home extends Component<Props, State> {
             return
         }
 
-        const monoplasma = new eth.contract(monoplasmaAbi).at(config.contractAddress)
+        // const monoplasma = new eth.contract(monoplasmaAbi).at(config.contractAddress)
+        const signer = ethersWeb3Provider.getSigner(accountAddress);
+        const monoplasma = new ethers.Contract(config.contractAddress, monoplasmaAbi, signer);
+
 
         let stealInstructions
-        fetch(`http://localhost:8080/demo/stealAllTokens?targetAddress=${accountAddress}`).then((resp) => resp.json()).then((res) => {
-            if (res.error) {
-                throw new Error(`Stealing failed, reason: ${res.error}`)
-            }
-            stealInstructions = res
-            console.log(`Steal request successful: ${JSON.stringify(stealInstructions)}. Waiting for block to unfreeze...`)
-            return sleep(Number.parseInt(config.blockFreezeSeconds || '0', 10) * 1000)
-        }).then(() => {
-            const { blockNumber, tokens, proof } = stealInstructions
-            return monoplasma.withdrawAll(blockNumber, tokens, proof, opts)
-        }).then(() => {
-            // eslint-disable-next-line no-alert
+        try {
+            const request = await fetch(`http://localhost:8080/demo/stealAllTokens?targetAddress=${accountAddress}`);
+            stealInstructions = await request.json();
+            console.log(`Steal request successful: ${JSON.stringify(stealInstructions)}. Waiting for block to unfreeze...`);
+            await sleep(Number.parseInt(config.blockFreezeSeconds || '0', 10) * 1000);
+            const { blockNumber, tokens, proof } = stealInstructions;
+            const result = await monoplasma.withdrawAll(blockNumber, tokens, proof);
             window.alert('Successfully stole all tokens, check your balances  :)')
-        }).catch(handleError)
+        } catch (e) {
+            handleError(e)
+        }
     }
 
     addBlockToList = (block: ?Block) => {
@@ -313,11 +299,11 @@ class Home extends Component<Props, State> {
         })
     }
 
-    updateUser(address: string) {
-        if (!Eth.isAddress(address)) {
+    async updateUser(address: string) {
+        if (!ethers.utils.getAddress(address)) {
             throw new Error(`Bad address: ${address}`)
         }
-        const { eth } = this.props
+        const { ethersWeb3Provider, accountAddress } = this.props
         const { config } = this.state
 
         if (!config) {
@@ -325,88 +311,91 @@ class Home extends Component<Props, State> {
         }
 
         // TODO: move contract instances into the state
-        const monoplasma = new eth.contract(monoplasmaAbi).at(config.contractAddress)
+        const signer = ethersWeb3Provider.getSigner(accountAddress);
+        const monoplasma = new ethers.Contract(config.contractAddress, monoplasmaAbi, signer);
 
-        let withdrawn
-        return monoplasma.withdrawn(address).then((res) => {
-            withdrawn = res[0] // eslint-disable-line prefer-destructuring
-            return fetch(`http://localhost:8080/api/members/${address}`).then((resp) => resp.json())
-        }).then((member) => {
-            const withdrawnBN = new BN(withdrawn || 0)
-            const recordedBN = new BN(member.withdrawableEarnings || 0)
-            const withdrawableBN = recordedBN.sub(withdrawnBN)
-            this.setState({
-                member,
-                account: [
-                    ['Total earnings', new BN(member.earnings || 0)],
-                    ['Earnings frozen', new BN(member.frozenEarnings || 0)],
-                    ['Total withdrawn', withdrawnBN],
-                    ['Total earnings recorded', recordedBN],
-                    ['Earnings available', withdrawableBN],
-                ],
-            })
-            return member
+        let withdrawnBN
+        withdrawnBN = await monoplasma.withdrawn(address);
+        const request = await fetch(`http://localhost:8080/api/members/${address}`);
+        const response = await request.json();
+        const recordedBN = ethers.utils.bigNumberify(response.withdrawableEarnings || 0)
+        const withdrawableBN = recordedBN.sub(withdrawnBN)
+        this.setState({
+            response,
+            account: [
+                ['Total earnings', ethers.utils.bigNumberify(response.earnings || 0)],
+                ['Earnings frozen', ethers.utils.bigNumberify(response.frozenEarnings || 0)],
+                ['Total withdrawn', withdrawnBN],
+                ['Total earnings recorded', recordedBN],
+                ['Earnings available', withdrawableBN],
+            ],
         })
+        return response
     }
 
     async updateCommunity() {
-        const { eth } = this.props
         const { config, latestBlockNumber } = this.state
+        const { accountAddress, ethersWeb3Provider } = this.props;
 
         if (!config) {
             throw new Error('Config hasn\'t been loaded from server, try refreshing the page')
         }
+        if (!accountAddress) {
+            return;
+        }
+
+        const signer = ethersWeb3Provider.getSigner(accountAddress);
+        const monoplasma = new ethers.Contract(config.contractAddress, monoplasmaAbi, signer);
+        const token = new ethers.Contract(config.tokenAddress, tokenAbi, signer);
+
 
         // TODO: move contract instances into the state
-        const monoplasma = new eth.contract(monoplasmaAbi).at(config.contractAddress)
-        const token = new eth.contract(tokenAbi).at(config.tokenAddress)
+        // const monoplasma = new eth.contract(monoplasmaAbi).at(config.contractAddress)
+        // const token = new eth.contract(tokenAbi).at(config.tokenAddress)
 
         let contractBalance
         let totalWithdrawn
 
-        return token.balanceOf(config.contractAddress).then((res) => {
-            contractBalance = res[0] // eslint-disable-line prefer-destructuring
-            return monoplasma.totalWithdrawn()
-        }).then((res) => {
-            totalWithdrawn = res[0] // eslint-disable-line prefer-destructuring
-            return fetch('http://localhost:8080/api/status').then((resp) => resp.json())
-        }).then((community) => {
-            if (!community.latestBlock) {
-                console.error(`Community status: ${JSON.stringify(community)}`)
-                return community
-            }
-            const recorded = new BN(community.latestBlock.totalEarnings || 0)
-            const totalEarningsInLatestWithdrawable = new BN(community.latestWithdrawableBlock.totalEarnings || 0)
-            const earningsAvailable = totalEarningsInLatestWithdrawable.sub(new BN(totalWithdrawn))
-            this.setState({
-                community,
-                revenuePool: [
-                    ['Members', toFixed18(community.memberCount.active)],
-                    ['Total earnings', new BN(community.totalEarnings)],
-                    ['Earnings frozen', new BN(recorded.sub(totalEarningsInLatestWithdrawable))],
-                    ['Contract balance', new BN(contractBalance)],
-                    ['Total earnings recorded', new BN(recorded)],
-                    ['Earnings available', earningsAvailable],
-                    null,
-                    ['Total withdrawn', new BN(totalWithdrawn)],
-                ],
-            })
-            const bnum = community.latestBlock.blockNumber
-            if (bnum && bnum !== latestBlockNumber) {
-                this.setState({
-                    latestBlockNumber: bnum,
-                })
-                this.addBlockToList(community.latestBlock)
-            }
-            return community
+        contractBalance = await token.balanceOf(config.contractAddress);
+        totalWithdrawn = await monoplasma.totalWithdrawn();
+        const request = await fetch('http://localhost:8080/api/status');
+        const response = await request.json();
+        if (!response.latestBlock) {
+            console.error(`Community status: ${JSON.stringify(response)}`)
+            return response
+        }
+
+        const recorded = ethers.utils.bigNumberify(response.latestBlock.totalEarnings || 0)
+        const totalEarningsInLatestWithdrawable = ethers.utils.bigNumberify(response.latestWithdrawableBlock.totalEarnings || 0)
+        const earningsAvailable = totalEarningsInLatestWithdrawable.sub(ethers.utils.bigNumberify(totalWithdrawn))
+        this.setState({
+            response,
+            revenuePool: [
+                ['Members', toFixed18(response.memberCount.active)],
+                ['Total earnings', ethers.utils.bigNumberify(response.totalEarnings)],
+                ['Earnings frozen', ethers.utils.bigNumberify(recorded.sub(totalEarningsInLatestWithdrawable))],
+                ['Contract balance', ethers.utils.bigNumberify(contractBalance)],
+                ['Total earnings recorded', ethers.utils.bigNumberify(recorded)],
+                ['Earnings available', earningsAvailable],
+                null,
+                ['Total withdrawn', ethers.utils.bigNumberify(totalWithdrawn)],
+            ],
         })
+        const bnum = response.latestBlock.blockNumber
+        if (bnum && bnum !== latestBlockNumber) {
+            this.setState({
+                latestBlockNumber: bnum,
+            })
+            this.addBlockToList(response.latestBlock)
+        }
+        return response
     }
 
     notification(): Node {
-        const { eth, accountAddress } = this.props
+        const { ethersWeb3Provider, accountAddress } = this.props
         const { serverConnectionError } = this.state
 
-        if (!eth) {
+        if (!ethersWeb3Provider) {
             return (
                 <Fragment>
                     <span>No wallet detected. please install </span>

@@ -5,14 +5,14 @@
 // node 9.5.0 crypto uses openssl 1.0.2f
 // const crypto = require("crypto")
 // For now, use replacement:
-const { keccak256 } = require("eth-lib").hash
+const ethers = require('ethers');
 
 /**
  * @param data to hash; a {String} or a {Buffer}
  * @returns {Buffer}
  */
 function hash(data) {
-    return Buffer.from(keccak256(data).slice(2), "hex")
+    return Buffer.from(ethers.utils.keccak256(data).slice(2), "hex")
 }
 function hashCombined(data1, data2) {
     if (typeof data1 === "string") {

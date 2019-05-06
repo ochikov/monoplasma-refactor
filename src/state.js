@@ -1,8 +1,8 @@
 const MonoplasmaMember = require("./member")
 const MerkleTree = require("./merkletree")
 const BN = require("bn.js")
-const {utils: { isAddress }} = require("web3")
 const now = require("./utils/now")
+const { isAddress } = require('./utils/checkArguments');
 
 /**
  * Monoplasma state object
